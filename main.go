@@ -57,10 +57,10 @@ type TmdbTvGetSeasonDetailsResponseEpisodes struct {
 }
 
 type TmdbTvGetSeasonDetailsResponse struct {
-	Name          string                                   `json:"name"`
-	Overview      string                                   `json:"overview"`
-	Season_number int                                      `json:"season_number"`
-	Episodes      []TmdbTvGetSeasonDetailsResponseEpisodes `json:"episodes"`
+	//Name          string                                   `json:"name"`
+	//Overview      string                                   `json:"overview"`
+	//Season_number int                                      `json:"season_number"`
+	Episodes []TmdbTvGetSeasonDetailsResponseEpisodes `json:"episodes"`
 }
 
 func main() {
@@ -172,26 +172,57 @@ func main() {
 
 		num_of_seasons := getDetailsResponse.Number_of_seasons
 
-		for i := 1; i <= num_of_seasons; i++ {
-			fmt.Println("SEASON ", i)
-			tmdb_search_url = "https://api.themoviedb.org/3/tv/" + strconv.Itoa(show_id) + "/season/" + strconv.Itoa(i) + "?api_key=" + api_key
-			resp, err = http.Get(tmdb_search_url)
-			if err != nil {
-				log.Fatalln("http request failed: ", err)
-			}
+		fmt.Print("Select Season 1 to ", strconv.Itoa(num_of_seasons), ": ")
+		selected_season_str, _ := reader.ReadString('\n')
+		selected_season_str = strings.Replace(selected_season_str, "\r\n", "", -1)
+		selected_season_str = strings.Replace(selected_season_str, "\n", "", -1)
 
-			defer resp.Body.Close()
-
-			// TODO: does not work yet
-			var getSeasonDetailsResponse TmdbTvGetSeasonDetailsResponse
-			err = json.Unmarshal(body, &getSeasonDetailsResponse)
-			if err != nil {
-				log.Fatalln(err)
-			}
-
-			fmt.Println(getSeasonDetailsResponse.Episodes)
-
+		tmdb_search_url = "https://api.themoviedb.org/3/tv/" + strconv.Itoa(show_id) + "/season/" + selected_season_str + "?api_key=" + api_key
+		fmt.Println("DEBUG: Get ", tmdb_search_url)
+		resp, err = http.Get(tmdb_search_url)
+		if err != nil {
+			log.Fatalln("http request failed: ", err)
 		}
+
+		defer resp.Body.Close()
+
+		body, err = ioutil.ReadAll(resp.Body)
+		if err != nil {
+			log.Fatalln(err)
+		}
+
+		var getSeasonDetailsResponse TmdbTvGetSeasonDetailsResponse
+		err = json.Unmarshal(body, &getSeasonDetailsResponse)
+		if err != nil {
+			log.Fatalln(err)
+		}
+
+		fmt.Println("Episodes from Season ", selected_season_str, ":")
+
+		for episode := range getSeasonDetailsResponse.Episodes {
+			fmt.Println(getSeasonDetailsResponse.Episodes[episode].Episode_number, " - ", getSeasonDetailsResponse.Episodes[episode].Name)
+		}
+
+		fmt.Print("Select Episode 1 to ", strconv.Itoa(len(getSeasonDetailsResponse.Episodes)), ": ")
+		selected_episode_str, _ := reader.ReadString('\n')
+		selected_episode_str = strings.Replace(selected_episode_str, "\r\n", "", -1)
+		selected_episode_str = strings.Replace(selected_episode_str, "\n", "", -1)
+
+		selected_episode, err := strconv.Atoi(selected_episode_str)
+		if err != nil {
+			log.Fatalln(err)
+		}
+
+		if selected_episode < 1 || selected_episode > len(getSeasonDetailsResponse.Episodes) {
+			fmt.Println("there's no such episode!")
+			fmt.Println()
+			continue
+		}
+
+		fmt.Println()
+		fmt.Println("Overview of Season ", selected_season_str, " Episode ", selected_episode_str, ":")
+		fmt.Println("   ", getSeasonDetailsResponse.Episodes[selected_episode-1].Overview)
+		fmt.Println()
 
 	}
 }
