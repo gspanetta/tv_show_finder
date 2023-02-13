@@ -14,19 +14,9 @@ import (
 )
 
 type TmdbQueryResponseResults struct {
-	Poster_path       string   `json:"poster_path"`
-	Populatity        float64  `json:"popularity"`
 	Id                int      `json:"id"`
-	Backdrop_path     string   `json:"backdrop_path"`
-	Vote_average      float64  `json:"vote_average"`
 	Overview          string   `json:"overview"`
-	First_air_date    string   `json:"first_air_date"`
-	Origin_country    []string `json:"origin_countr"`
-	Genre_ids         []int    `json:"genre_ids"`
-	Original_language string   `json:"original_language"`
-	Vote_count        int      `json:"vote_count"`
 	Name              string   `json:"name"`
-	Original_name     string   `json:"original_name"`
 }
 
 type TmdbQueryResponse struct {
@@ -36,18 +26,8 @@ type TmdbQueryResponse struct {
 	Total_pages   int                        `json:"total_pages"`
 }
 
-// TODO: kann raus
-type TmdbTvGetDetailsResponseSeasons struct {
-	Episode_count int    `json:"episode_count"`
-	Id            int    `json:"id"`
-	Name          string `json:"name"`
-	Overview      string `json:"overview"`
-	Season_number int    `json:"season_number"`
-}
-
 type TmdbTvGetDetailsResponse struct {
 	Number_of_seasons int                               `json:"number_of_seasons"`
-	Seasons           []TmdbTvGetDetailsResponseSeasons `json:"seasons"`
 }
 
 type TmdbTvGetSeasonDetailsResponseEpisodes struct {
@@ -57,9 +37,6 @@ type TmdbTvGetSeasonDetailsResponseEpisodes struct {
 }
 
 type TmdbTvGetSeasonDetailsResponse struct {
-	//Name          string                                   `json:"name"`
-	//Overview      string                                   `json:"overview"`
-	//Season_number int                                      `json:"season_number"`
 	Episodes []TmdbTvGetSeasonDetailsResponseEpisodes `json:"episodes"`
 }
 
@@ -75,6 +52,7 @@ func main() {
 
 	for {
 		// wait for user input
+		fmt.Println()
 		fmt.Println("Search for TV show (enter keywords or type 'q' to exit)")
 		fmt.Print("> ")
 		query, _ := reader.ReadString('\n')
@@ -121,7 +99,6 @@ func main() {
 		}
 
 		// let user select a show
-		// TODO: if no valid selection or wrong input: user should re-input a number
 		fmt.Println("Which show do you want to watch? Select number (or choose 0 to go back to the search mask)")
 		fmt.Print("> ")
 		numstr, _ := reader.ReadString('\n')
@@ -135,18 +112,11 @@ func main() {
 		}
 
 		if num == 0 {
-			fmt.Println()
 			continue
 		} else if num > 20 || num < 0 {
 			fmt.Println("No valid selection")
-			fmt.Println()
 			continue
 		}
-
-		// display overview of selected show or go back to search mask
-		fmt.Println("\nOverview:")
-		fmt.Println(show_list[num-1].Overview)
-		fmt.Println()
 
 		show_id := show_list[num-1].Id
 
@@ -172,11 +142,13 @@ func main() {
 
 		num_of_seasons := getDetailsResponse.Number_of_seasons
 
+		// let user select a season
 		fmt.Print("Select Season 1 to ", strconv.Itoa(num_of_seasons), ": ")
 		selected_season_str, _ := reader.ReadString('\n')
 		selected_season_str = strings.Replace(selected_season_str, "\r\n", "", -1)
 		selected_season_str = strings.Replace(selected_season_str, "\n", "", -1)
 
+		// get episodes of the selected season
 		tmdb_search_url = "https://api.themoviedb.org/3/tv/" + strconv.Itoa(show_id) + "/season/" + selected_season_str + "?api_key=" + api_key
 		fmt.Println("DEBUG: Get ", tmdb_search_url)
 		resp, err = http.Get(tmdb_search_url)
@@ -197,12 +169,14 @@ func main() {
 			log.Fatalln(err)
 		}
 
+		// display list of episodes
 		fmt.Println("Episodes from Season ", selected_season_str, ":")
 
 		for episode := range getSeasonDetailsResponse.Episodes {
 			fmt.Println(getSeasonDetailsResponse.Episodes[episode].Episode_number, " - ", getSeasonDetailsResponse.Episodes[episode].Name)
 		}
 
+		// let user select episode
 		fmt.Print("Select Episode 1 to ", strconv.Itoa(len(getSeasonDetailsResponse.Episodes)), ": ")
 		selected_episode_str, _ := reader.ReadString('\n')
 		selected_episode_str = strings.Replace(selected_episode_str, "\r\n", "", -1)
@@ -215,14 +189,13 @@ func main() {
 
 		if selected_episode < 1 || selected_episode > len(getSeasonDetailsResponse.Episodes) {
 			fmt.Println("there's no such episode!")
-			fmt.Println()
 			continue
 		}
 
+		// display name and overview of the selected episode
 		fmt.Println()
-		fmt.Println("Overview of Season ", selected_season_str, " Episode ", selected_episode_str, ":")
+		fmt.Println("Overview of Season ", selected_season_str, " Episode ", selected_episode_str, ": ", getSeasonDetailsResponse.Episodes[selected_episode-1].Name)
 		fmt.Println("   ", getSeasonDetailsResponse.Episodes[selected_episode-1].Overview)
-		fmt.Println()
 
 	}
 }
