@@ -9,14 +9,15 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"reflect"
 	"strconv"
 	"strings"
 )
 
 type TmdbQueryResponseResults struct {
-	Id                int      `json:"id"`
-	Overview          string   `json:"overview"`
-	Name              string   `json:"name"`
+	Id       int    `json:"id"`
+	Overview string `json:"overview"`
+	Name     string `json:"name"`
 }
 
 type TmdbQueryResponse struct {
@@ -27,7 +28,7 @@ type TmdbQueryResponse struct {
 }
 
 type TmdbTvGetDetailsResponse struct {
-	Number_of_seasons int                               `json:"number_of_seasons"`
+	Number_of_seasons int `json:"number_of_seasons"`
 }
 
 type TmdbTvGetSeasonDetailsResponseEpisodes struct {
@@ -40,6 +41,63 @@ type TmdbTvGetSeasonDetailsResponse struct {
 	Episodes []TmdbTvGetSeasonDetailsResponseEpisodes `json:"episodes"`
 }
 
+func getUserInputStr(prompt string) string {
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Println()
+	fmt.Println(prompt)
+	fmt.Print("> ")
+	query, _ := reader.ReadString('\n')
+	query = strings.Replace(query, "\r\n", "", -1)
+	query = strings.Replace(query, "\n", "", -1)
+
+	return query
+}
+
+func getUserInputNum(prompt string) (int, error) {
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Println()
+	fmt.Println(prompt)
+	fmt.Print("> ")
+	query, _ := reader.ReadString('\n')
+	query = strings.Replace(query, "\r\n", "", -1)
+	query = strings.Replace(query, "\n", "", -1)
+
+	num, err := strconv.Atoi(query)
+	if err != nil {
+		log.Fatalln(err)
+		return 0, err
+	}
+
+	return num, nil
+}
+
+func httpRequest(uri string, sink interface{}) error {
+	v := reflect.ValueOf(sink)
+	if v.Kind() != reflect.Ptr || v.Elem().Kind() != reflect.Struct {
+		return fmt.Errorf("sink is not a struct pointer") // TODO proper error handling
+	}
+
+	resp, err := http.Get(uri)
+	if err != nil {
+		log.Fatalln("http request failed: ", err)
+	}
+
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	//var queryResponse TmdbQueryResponse
+	err = json.Unmarshal(body, sink)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	return nil
+}
+
 func main() {
 	// get TMDB API key from environment variable
 	api_key := os.Getenv("TMDB_API_KEY")
@@ -48,16 +106,9 @@ func main() {
 		return
 	}
 
-	reader := bufio.NewReader(os.Stdin)
-
 	for {
 		// wait for user input
-		fmt.Println()
-		fmt.Println("Search for TV show (enter keywords or type 'q' to exit)")
-		fmt.Print("> ")
-		query, _ := reader.ReadString('\n')
-		query = strings.Replace(query, "\r\n", "", -1)
-		query = strings.Replace(query, "\n", "", -1)
+		query := getUserInputStr("Search for TV show (enter keywords or type 'q' to exit)")
 
 		// quit program when "q" is entered, restart when nothing is entered
 		if strings.Compare("q", query) == 0 {
@@ -67,25 +118,8 @@ func main() {
 			continue
 		}
 
-		// search for tv show at tmdb -> "adult=false" because customer wants children to watch
-		tmdb_search_url := "https://api.themoviedb.org/3/search/tv?api_key=" + api_key + "&query=" + url.QueryEscape(query) + "&include_adult=false"
-		resp, err := http.Get(tmdb_search_url)
-		if err != nil {
-			log.Fatalln("http request failed: ", err)
-		}
-
-		defer resp.Body.Close()
-
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			log.Fatalln(err)
-		}
-
 		var queryResponse TmdbQueryResponse
-		err = json.Unmarshal(body, &queryResponse)
-		if err != nil {
-			log.Fatalln(err)
-		}
+		httpRequest("https://api.themoviedb.org/3/search/tv?api_key="+api_key+"&query="+url.QueryEscape(query)+"&include_adult=false", &queryResponse)
 
 		show_list := queryResponse.Results
 
@@ -99,103 +133,57 @@ func main() {
 		}
 
 		// let user select a show
-		fmt.Println("Which show do you want to watch? Select number (or choose 0 to go back to the search mask)")
-		fmt.Print("> ")
-		numstr, _ := reader.ReadString('\n')
-		numstr = strings.Replace(numstr, "\r\n", "", -1)
-		numstr = strings.Replace(numstr, "\n", "", -1)
+		selectedShow, _ := getUserInputNum("Select TV show")
 
-		num, err := strconv.Atoi(numstr)
-		if err != nil {
-			fmt.Println(err)
+		if selectedShow == 0 {
 			continue
-		}
-
-		if num == 0 {
-			continue
-		} else if num > 20 || num < 0 {
+		} else if selectedShow > 20 || selectedShow < 0 {
 			fmt.Println("No valid selection")
 			continue
 		}
 
-		show_id := show_list[num-1].Id
+		show_id := show_list[selectedShow-1].Id
 
 		// get all seasons
-		tmdb_search_url = "https://api.themoviedb.org/3/tv/" + strconv.Itoa(show_id) + "?api_key=" + api_key
-		resp, err = http.Get(tmdb_search_url)
-		if err != nil {
-			log.Fatalln("http request failed: ", err)
-		}
-
-		defer resp.Body.Close()
-
-		body, err = ioutil.ReadAll(resp.Body)
-		if err != nil {
-			log.Fatalln(err)
-		}
-
 		var getDetailsResponse TmdbTvGetDetailsResponse
-		err = json.Unmarshal(body, &getDetailsResponse)
-		if err != nil {
-			log.Fatalln(err)
-		}
+		httpRequest("https://api.themoviedb.org/3/tv/"+strconv.Itoa(show_id)+"?api_key="+api_key, &getDetailsResponse)
 
 		num_of_seasons := getDetailsResponse.Number_of_seasons
 
 		// let user select a season
-		fmt.Print("Select Season 1 to ", strconv.Itoa(num_of_seasons), ": ")
-		selected_season_str, _ := reader.ReadString('\n')
-		selected_season_str = strings.Replace(selected_season_str, "\r\n", "", -1)
-		selected_season_str = strings.Replace(selected_season_str, "\n", "", -1)
+		// read user input as number and convert to string afterwards, so we get an error when the user does not enter a number
+		selectedSeason, _ := getUserInputNum("Select Season 1 to " + strconv.Itoa(num_of_seasons))
+		if selectedSeason < 0 && selectedSeason > num_of_seasons {
+			fmt.Println("No valid selection!")
+			continue
+			// TODO: go back to prompt
+		}
+
+		strSelectedSeason := strconv.Itoa(selectedSeason)
 
 		// get episodes of the selected season
-		tmdb_search_url = "https://api.themoviedb.org/3/tv/" + strconv.Itoa(show_id) + "/season/" + selected_season_str + "?api_key=" + api_key
-		fmt.Println("DEBUG: Get ", tmdb_search_url)
-		resp, err = http.Get(tmdb_search_url)
-		if err != nil {
-			log.Fatalln("http request failed: ", err)
-		}
-
-		defer resp.Body.Close()
-
-		body, err = ioutil.ReadAll(resp.Body)
-		if err != nil {
-			log.Fatalln(err)
-		}
-
 		var getSeasonDetailsResponse TmdbTvGetSeasonDetailsResponse
-		err = json.Unmarshal(body, &getSeasonDetailsResponse)
-		if err != nil {
-			log.Fatalln(err)
-		}
+		httpRequest("https://api.themoviedb.org/3/tv/"+strconv.Itoa(show_id)+"/season/"+strSelectedSeason+"?api_key="+api_key, &getSeasonDetailsResponse)
 
 		// display list of episodes
-		fmt.Println("Episodes from Season ", selected_season_str, ":")
+		fmt.Println("Episodes from Season ", strSelectedSeason, ":")
 
 		for episode := range getSeasonDetailsResponse.Episodes {
 			fmt.Println(getSeasonDetailsResponse.Episodes[episode].Episode_number, " - ", getSeasonDetailsResponse.Episodes[episode].Name)
 		}
 
 		// let user select episode
-		fmt.Print("Select Episode 1 to ", strconv.Itoa(len(getSeasonDetailsResponse.Episodes)), ": ")
-		selected_episode_str, _ := reader.ReadString('\n')
-		selected_episode_str = strings.Replace(selected_episode_str, "\r\n", "", -1)
-		selected_episode_str = strings.Replace(selected_episode_str, "\n", "", -1)
+		selectedEpisode, _ := getUserInputNum("Select Episode 1 to " + strconv.Itoa(len(getSeasonDetailsResponse.Episodes)))
 
-		selected_episode, err := strconv.Atoi(selected_episode_str)
-		if err != nil {
-			log.Fatalln(err)
-		}
-
-		if selected_episode < 1 || selected_episode > len(getSeasonDetailsResponse.Episodes) {
+		if selectedEpisode < 1 || selectedEpisode > len(getSeasonDetailsResponse.Episodes) {
 			fmt.Println("there's no such episode!")
 			continue
 		}
 
 		// display name and overview of the selected episode
 		fmt.Println()
-		fmt.Println("Overview of Season ", selected_season_str, " Episode ", selected_episode_str, ": ", getSeasonDetailsResponse.Episodes[selected_episode-1].Name)
-		fmt.Println("   ", getSeasonDetailsResponse.Episodes[selected_episode-1].Overview)
+		fmt.Println("Overview of Season ", strSelectedSeason, " Episode ", strconv.Itoa(selectedEpisode), ": ", getSeasonDetailsResponse.Episodes[selectedEpisode-1].Name)
+		fmt.Println("   ", getSeasonDetailsResponse.Episodes[selectedEpisode-1].Overview)
 
 	}
 }
