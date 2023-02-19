@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -50,19 +49,20 @@ func getUserInputStr(prompt string) string {
 	query = strings.Replace(query, "\r\n", "", -1)
 	query = strings.Replace(query, "\n", "", -1)
 
+	if strings.Compare("q", query) == 0 {
+		fmt.Println("Goodbye!")
+		os.Exit(0)
+	}
+
 	return query
 }
 
 func getUserInputNum(prompt string) (int, error) {
 	query := getUserInputStr(prompt)
 
-	if strings.Compare("q", query) == 0 {
-		os.Exit(0)
-	}
-
 	num, err := strconv.Atoi(query)
 	if err != nil {
-		log.Fatalln(err)
+		fmt.Println("No valid input")
 		return 0, err
 	}
 
@@ -72,24 +72,27 @@ func getUserInputNum(prompt string) (int, error) {
 func httpRequest(uri string, sink interface{}) error {
 	v := reflect.ValueOf(sink)
 	if v.Kind() != reflect.Ptr || v.Elem().Kind() != reflect.Struct {
-		return fmt.Errorf("sink is not a struct pointer") // TODO proper error handling
+		return fmt.Errorf("sink is not a struct pointer")
 	}
 
 	resp, err := http.Get(uri)
 	if err != nil {
-		log.Fatalln("http request failed: ", err)
+		fmt.Println("HTTP request failed: ", err)
+		return err
 	}
 
 	defer resp.Body.Close()
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		log.Fatalln(err)
+		fmt.Println("Could not read body: ", err)
+		return err
 	}
 
 	err = json.Unmarshal(body, sink)
 	if err != nil {
-		log.Fatalln(err)
+		fmt.Println("Could not parse body: ", err)
+		return err
 	}
 
 	return nil
@@ -115,11 +118,8 @@ func userQuery() {
 	// wait for user input
 	query := getUserInputStr("Search for TV show (enter keywords or type 'q' to exit)")
 
-	// quit program when "q" is entered, restart when nothing is entered
-	if strings.Compare("q", query) == 0 {
-		fmt.Println("Goodbye!")
-		os.Exit(0)
-	} else if strings.Compare("", query) == 0 {
+	// restart when nothing is entered
+	if strings.Compare("", query) == 0 {
 		return
 	}
 
@@ -148,7 +148,6 @@ func userSelectShow() {
 
 	// let user select a show
 	selectedShow, err := getUserInputNum("Select TV show")
-
 	if err != nil {
 		fmt.Println("No valid input")
 		return
@@ -180,7 +179,7 @@ func userSelectSeason() {
 		return
 	}
 
-	if selectedSeason < 0 && selectedSeason > num_of_seasons {
+	if selectedSeason < 0 || selectedSeason > num_of_seasons {
 		fmt.Println("No valid selection!")
 		return
 	}
