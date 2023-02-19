@@ -11,6 +11,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"io"
 )
 
 type TmdbQueryResponseResults struct {
@@ -40,8 +41,27 @@ type TmdbTvGetSeasonDetailsResponse struct {
 	Episodes []TmdbTvGetSeasonDetailsResponseEpisodes `json:"episodes"`
 }
 
+var input io.Reader
+
+var api_key string
+var show_list []TmdbQueryResponseResults
+var num_of_seasons int
+var strSelectedSeason string
+var show_id int
+
+var currentState int
+var nextState int
+
+const (
+	stateUserQuery         int = 0
+	stateUserSelectShow        = 1
+	stateUserSelectSeason      = 2
+	stateUserSelectEpisode     = 3
+)
+
+
 func getUserInputStr(prompt string) string {
-	reader := bufio.NewReader(os.Stdin)
+	reader := bufio.NewReader(input)
 	fmt.Println()
 	fmt.Println(prompt)
 	fmt.Print("> ")
@@ -97,22 +117,6 @@ func httpRequest(uri string, sink interface{}) error {
 
 	return nil
 }
-
-var api_key string
-var show_list []TmdbQueryResponseResults
-var num_of_seasons int
-var strSelectedSeason string
-var show_id int
-
-const (
-	stateUserQuery         int = 0
-	stateUserSelectShow        = 1
-	stateUserSelectSeason      = 2
-	stateUserSelectEpisode     = 3
-)
-
-var currentState int
-var nextState int
 
 func userQuery() {
 	// wait for user input
@@ -228,6 +232,8 @@ func main() {
 		fmt.Println("Please set TMDB_API_KEY environment variable")
 		return
 	}
+
+	input = os.Stdin
 
 	currentState = stateUserQuery
 	nextState = stateUserQuery
