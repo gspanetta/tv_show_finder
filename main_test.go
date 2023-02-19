@@ -7,26 +7,27 @@ import (
 )
 
 func TestUserInputString(t *testing.T) {
+	var context Context
 	var stdin bytes.Buffer
 	var userInput string
-	input = &stdin
+	context.input = &stdin
 
 	stdin.Write([]byte("1234"))
-	userInput = getUserInputStr("test")
+	userInput = getUserInputStr(&context, "test")
 
 	if strings.Compare(userInput, "1234") != 0 {
 		t.Errorf("Expected: 1234; got: %v", userInput)
 	}
 
 	stdin.Write([]byte("hello world\n"))
-	userInput = getUserInputStr("test")
+	userInput = getUserInputStr(&context, "test")
 
 	if strings.Compare(userInput, "hello world") != 0 {
 		t.Errorf("Expected: hello world; got: %v", userInput)
 	}
 
 	stdin.Write([]byte("hello world\r\n"))
-	userInput = getUserInputStr("test")
+	userInput = getUserInputStr(&context, "test")
 
 	if strings.Compare(userInput, "hello world") != 0 {
 		t.Errorf("Expected: hello world; got: %v", userInput)
@@ -35,11 +36,12 @@ func TestUserInputString(t *testing.T) {
 }
 
 func TestUserInputNumber(t *testing.T) {
+	var context Context
 	var stdin bytes.Buffer
-	input = &stdin
+	context.input = &stdin
 
 	stdin.Write([]byte("12"))
-	num, err := getUserInputNum("test")
+	num, err := getUserInputNum(&context, "test")
 
 	if err != nil {
 		t.Errorf("getUserInputNum threw an error: %v on input '12'", err)
@@ -50,7 +52,7 @@ func TestUserInputNumber(t *testing.T) {
 	}
 
 	stdin.Write([]byte("hello world\n"))
-	num, err = getUserInputNum("test")
+	num, err = getUserInputNum(&context, "test")
 
 	if err == nil {
 		t.Errorf("getUserInputNum didn't throw an error on string input")

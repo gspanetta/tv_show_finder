@@ -41,16 +41,16 @@ type TmdbTvGetSeasonDetailsResponse struct {
 	Episodes []TmdbTvGetSeasonDetailsResponseEpisodes `json:"episodes"`
 }
 
-var input io.Reader
-
-var api_key string
-var show_list []TmdbQueryResponseResults
-var num_of_seasons int
-var strSelectedSeason string
-var show_id int
-
-var currentState int
-var nextState int
+type Context struct {
+	input io.Reader
+	api_key string
+	show_list []TmdbQueryResponseResults
+	num_of_seasons int
+	strSelectedSeason string
+	show_id int
+	currentState int
+	nextState int
+}
 
 const (
 	stateUserQuery         int = 0
@@ -60,8 +60,8 @@ const (
 )
 
 
-func getUserInputStr(prompt string) string {
-	reader := bufio.NewReader(input)
+func getUserInputStr(ctx *Context, prompt string) string {
+	reader := bufio.NewReader(ctx.input)
 	fmt.Println()
 	fmt.Println(prompt)
 	fmt.Print("> ")
@@ -77,8 +77,8 @@ func getUserInputStr(prompt string) string {
 	return query
 }
 
-func getUserInputNum(prompt string) (int, error) {
-	query := getUserInputStr(prompt)
+func getUserInputNum(ctx *Context, prompt string) (int, error) {
+	query := getUserInputStr(ctx, prompt)
 
 	num, err := strconv.Atoi(query)
 	if err != nil {
@@ -118,9 +118,9 @@ func httpRequest(uri string, sink interface{}) error {
 	return nil
 }
 
-func userQuery() {
+func userQuery(ctx *Context) {
 	// wait for user input
-	query := getUserInputStr("Search for TV show (enter keywords or type 'q' to exit)")
+	query := getUserInputStr(ctx, "Search for TV show (enter keywords or type 'q' to exit)")
 
 	// restart when nothing is entered
 	if strings.Compare("", query) == 0 {
@@ -128,10 +128,10 @@ func userQuery() {
 	}
 
 	var queryResponse TmdbQueryResponse
-	httpRequest("https://api.themoviedb.org/3/search/tv?api_key="+api_key+"&query="+url.QueryEscape(query)+"&include_adult=false", &queryResponse)
-	show_list = queryResponse.Results
+	httpRequest("https://api.themoviedb.org/3/search/tv?api_key="+ctx.api_key+"&query="+url.QueryEscape(query)+"&include_adult=false", &queryResponse)
+	ctx.show_list = queryResponse.Results
 
-	if len(show_list) == 0 {
+	if len(ctx.show_list) == 0 {
 		fmt.Println("Didn't find anything. Please try searching with other keywords.")
 		return
 	}
@@ -140,18 +140,18 @@ func userQuery() {
 		fmt.Println(" -- more than 20 entries found, please add more keywords --")
 	}
 
-	nextState = stateUserSelectShow
+	ctx.nextState = stateUserSelectShow
 }
 
-func userSelectShow() {
+func userSelectShow(ctx *Context) {
 
 	// display all shows found
-	for show := range show_list {
-		fmt.Println(show+1, ": ", show_list[show].Name)
+	for show := range ctx.show_list {
+		fmt.Println(show+1, ": ", ctx.show_list[show].Name)
 	}
 
 	// let user select a show
-	selectedShow, err := getUserInputNum("Select TV show")
+	selectedShow, err := getUserInputNum(ctx, "Select TV show")
 	if err != nil {
 		fmt.Println("No valid input")
 		return
@@ -162,51 +162,51 @@ func userSelectShow() {
 		return
 	}
 
-	show_id = show_list[selectedShow-1].Id
+	ctx.show_id = ctx.show_list[selectedShow-1].Id
 
 	// get all seasons
 	var getDetailsResponse TmdbTvGetDetailsResponse
-	httpRequest("https://api.themoviedb.org/3/tv/"+strconv.Itoa(show_id)+"?api_key="+api_key, &getDetailsResponse)
+	httpRequest("https://api.themoviedb.org/3/tv/"+strconv.Itoa(ctx.show_id)+"?api_key="+ctx.api_key, &getDetailsResponse)
 
-	num_of_seasons = getDetailsResponse.Number_of_seasons
+	ctx.num_of_seasons = getDetailsResponse.Number_of_seasons
 
-	nextState = stateUserSelectSeason
+	ctx.nextState = stateUserSelectSeason
 }
 
-func userSelectSeason() {
+func userSelectSeason(ctx *Context) {
 	// let user select a season
 	// read user input as number and convert to string afterwards, so we get an error when the user does not enter a number
-	selectedSeason, err := getUserInputNum("Select Season 1 to " + strconv.Itoa(num_of_seasons))
+	selectedSeason, err := getUserInputNum(ctx, "Select Season 1 to " + strconv.Itoa(ctx.num_of_seasons))
 
 	if err != nil {
 		fmt.Println("No valid input")
 		return
 	}
 
-	if selectedSeason < 0 || selectedSeason > num_of_seasons {
+	if selectedSeason < 0 || selectedSeason > ctx.num_of_seasons {
 		fmt.Println("No valid selection!")
 		return
 	}
 
-	strSelectedSeason = strconv.Itoa(selectedSeason)
+	ctx.strSelectedSeason = strconv.Itoa(selectedSeason)
 
-	nextState = stateUserSelectEpisode
+	ctx.nextState = stateUserSelectEpisode
 }
 
-func userSelectEpisode() {
+func userSelectEpisode(ctx *Context) {
 	// get episodes of the selected season
 	var getSeasonDetailsResponse TmdbTvGetSeasonDetailsResponse
-	httpRequest("https://api.themoviedb.org/3/tv/"+strconv.Itoa(show_id)+"/season/"+strSelectedSeason+"?api_key="+api_key, &getSeasonDetailsResponse)
+	httpRequest("https://api.themoviedb.org/3/tv/"+strconv.Itoa(ctx.show_id)+"/season/"+ctx.strSelectedSeason+"?api_key="+ctx.api_key, &getSeasonDetailsResponse)
 
 	// display list of episodes
-	fmt.Println("Episodes from Season ", strSelectedSeason, ":")
+	fmt.Println("Episodes from Season ", ctx.strSelectedSeason, ":")
 
 	for episode := range getSeasonDetailsResponse.Episodes {
 		fmt.Println(getSeasonDetailsResponse.Episodes[episode].Episode_number, " - ", getSeasonDetailsResponse.Episodes[episode].Name)
 	}
 
 	// let user select episode
-	selectedEpisode, err := getUserInputNum("Select Episode 1 to " + strconv.Itoa(len(getSeasonDetailsResponse.Episodes)))
+	selectedEpisode, err := getUserInputNum(ctx, "Select Episode 1 to " + strconv.Itoa(len(getSeasonDetailsResponse.Episodes)))
 
 	if err != nil {
 		fmt.Println("No valid selection")
@@ -219,39 +219,39 @@ func userSelectEpisode() {
 
 	// display name and overview of the selected episode
 	fmt.Println()
-	fmt.Println("Overview of Season ", strSelectedSeason, " Episode ", strconv.Itoa(selectedEpisode), ": ", getSeasonDetailsResponse.Episodes[selectedEpisode-1].Name)
+	fmt.Println("Overview of Season ", ctx.strSelectedSeason, " Episode ", strconv.Itoa(selectedEpisode), ": ", getSeasonDetailsResponse.Episodes[selectedEpisode-1].Name)
 	fmt.Println("   ", getSeasonDetailsResponse.Episodes[selectedEpisode-1].Overview)
 
-	nextState = stateUserQuery
+	ctx.nextState = stateUserQuery
 }
 
 func main() {
+	var context Context
+
 	// get TMDB API key from environment variable
-	api_key = os.Getenv("TMDB_API_KEY")
-	if api_key == "" {
+	context.api_key = os.Getenv("TMDB_API_KEY")
+	if context.api_key == "" {
 		fmt.Println("Please set TMDB_API_KEY environment variable")
 		return
 	}
-
-	input = os.Stdin
-
-	currentState = stateUserQuery
-	nextState = stateUserQuery
+	context.input = os.Stdin
+	context.currentState = stateUserQuery
+	context.nextState = stateUserQuery
 
 	for {
-		switch currentState {
+		switch context.currentState {
 		case stateUserQuery:
-			userQuery()
+			userQuery(&context)
 		case stateUserSelectShow:
-			userSelectShow()
+			userSelectShow(&context)
 		case stateUserSelectSeason:
-			userSelectSeason()
+			userSelectSeason(&context)
 		case stateUserSelectEpisode:
-			userSelectEpisode()
+			userSelectEpisode(&context)
 		}
 
-		if nextState != currentState {
-			currentState = nextState
+		if context.nextState != context.currentState {
+			context.currentState = context.nextState
 		}
 	}
 }
