@@ -128,7 +128,7 @@ func userQuery(ctx *Context) {
 	}
 
 	var queryResponse TmdbQueryResponse
-	httpRequest("https://api.themoviedb.org/3/search/tv?apiKey="+ctx.apiKey+"&query="+url.QueryEscape(query)+"&include_adult=false", &queryResponse)
+	httpRequest("https://api.themoviedb.org/3/search/tv?api_key="+ctx.apiKey+"&query="+url.QueryEscape(query)+"&include_adult=false", &queryResponse)
 	ctx.showList = queryResponse.Results
 
 	if len(ctx.showList) == 0 {
@@ -169,7 +169,7 @@ func userSelectShow(ctx *Context) {
 
 	// get all seasons
 	var getDetailsResponse TmdbTvGetDetailsResponse
-	httpRequest("https://api.themoviedb.org/3/tv/"+strconv.Itoa(ctx.showId)+"?apiKey="+ctx.apiKey, &getDetailsResponse)
+	httpRequest("https://api.themoviedb.org/3/tv/"+strconv.Itoa(ctx.showId)+"?api_key="+ctx.apiKey, &getDetailsResponse)
 
 	ctx.numOfSeasons = getDetailsResponse.Number_of_seasons
 
@@ -199,7 +199,7 @@ func userSelectSeason(ctx *Context) {
 func userSelectEpisode(ctx *Context) {
 	// get episodes of the selected season
 	var getSeasonDetailsResponse TmdbTvGetSeasonDetailsResponse
-	httpRequest("https://api.themoviedb.org/3/tv/"+strconv.Itoa(ctx.showId)+"/season/"+ctx.strSelectedSeason+"?apiKey="+ctx.apiKey, &getSeasonDetailsResponse)
+	httpRequest("https://api.themoviedb.org/3/tv/"+strconv.Itoa(ctx.showId)+"/season/"+ctx.strSelectedSeason+"?api_key="+ctx.apiKey, &getSeasonDetailsResponse)
 
 	// display list of episodes
 	fmt.Println("Episodes from Season ", ctx.strSelectedSeason, ":")
