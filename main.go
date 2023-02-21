@@ -43,11 +43,11 @@ type TmdbTvGetSeasonDetailsResponse struct {
 
 type Context struct {
 	input io.Reader
-	api_key string
-	show_list []TmdbQueryResponseResults
-	num_of_seasons int
+	apiKey string
+	showList []TmdbQueryResponseResults
+	numOfSeasons int
 	strSelectedSeason string
-	show_id int
+	showId int
 	currentState int
 	nextState int
 }
@@ -128,10 +128,10 @@ func userQuery(ctx *Context) {
 	}
 
 	var queryResponse TmdbQueryResponse
-	httpRequest("https://api.themoviedb.org/3/search/tv?api_key="+ctx.api_key+"&query="+url.QueryEscape(query)+"&include_adult=false", &queryResponse)
-	ctx.show_list = queryResponse.Results
+	httpRequest("https://api.themoviedb.org/3/search/tv?apiKey="+ctx.apiKey+"&query="+url.QueryEscape(query)+"&include_adult=false", &queryResponse)
+	ctx.showList = queryResponse.Results
 
-	if len(ctx.show_list) == 0 {
+	if len(ctx.showList) == 0 {
 		fmt.Println("Didn't find anything. Please try searching with other keywords.")
 		return
 	}
@@ -146,8 +146,8 @@ func userQuery(ctx *Context) {
 func userSelectShow(ctx *Context) {
 
 	// display all shows found
-	for show := range ctx.show_list {
-		fmt.Println(show+1, ": ", ctx.show_list[show].Name)
+	for show := range ctx.showList {
+		fmt.Println(show+1, ": ", ctx.showList[show].Name)
 	}
 
 	// let user select a show
@@ -165,13 +165,13 @@ func userSelectShow(ctx *Context) {
 		return
 	}
 
-	ctx.show_id = ctx.show_list[selectedShow-1].Id
+	ctx.showId = ctx.showList[selectedShow-1].Id
 
 	// get all seasons
 	var getDetailsResponse TmdbTvGetDetailsResponse
-	httpRequest("https://api.themoviedb.org/3/tv/"+strconv.Itoa(ctx.show_id)+"?api_key="+ctx.api_key, &getDetailsResponse)
+	httpRequest("https://api.themoviedb.org/3/tv/"+strconv.Itoa(ctx.showId)+"?apiKey="+ctx.apiKey, &getDetailsResponse)
 
-	ctx.num_of_seasons = getDetailsResponse.Number_of_seasons
+	ctx.numOfSeasons = getDetailsResponse.Number_of_seasons
 
 	ctx.nextState = stateUserSelectSeason
 }
@@ -179,14 +179,14 @@ func userSelectShow(ctx *Context) {
 func userSelectSeason(ctx *Context) {
 	// let user select a season
 	// read user input as number and convert to string afterwards, so we get an error when the user does not enter a number
-	selectedSeason, err := getUserInputNum(ctx, "Select Season 1 to " + strconv.Itoa(ctx.num_of_seasons))
+	selectedSeason, err := getUserInputNum(ctx, "Select Season 1 to " + strconv.Itoa(ctx.numOfSeasons))
 
 	if err != nil {
 		fmt.Println("No valid input")
 		return
 	}
 
-	if selectedSeason < 0 || selectedSeason > ctx.num_of_seasons {
+	if selectedSeason < 0 || selectedSeason > ctx.numOfSeasons {
 		fmt.Println("No valid selection!")
 		return
 	}
@@ -199,7 +199,7 @@ func userSelectSeason(ctx *Context) {
 func userSelectEpisode(ctx *Context) {
 	// get episodes of the selected season
 	var getSeasonDetailsResponse TmdbTvGetSeasonDetailsResponse
-	httpRequest("https://api.themoviedb.org/3/tv/"+strconv.Itoa(ctx.show_id)+"/season/"+ctx.strSelectedSeason+"?api_key="+ctx.api_key, &getSeasonDetailsResponse)
+	httpRequest("https://api.themoviedb.org/3/tv/"+strconv.Itoa(ctx.showId)+"/season/"+ctx.strSelectedSeason+"?apiKey="+ctx.apiKey, &getSeasonDetailsResponse)
 
 	// display list of episodes
 	fmt.Println("Episodes from Season ", ctx.strSelectedSeason, ":")
@@ -232,8 +232,8 @@ func main() {
 	var context Context
 
 	// get TMDB API key from environment variable
-	context.api_key = os.Getenv("TMDB_API_KEY")
-	if context.api_key == "" {
+	context.apiKey = os.Getenv("TMDB_API_KEY")
+	if context.apiKey == "" {
 		fmt.Println("Please set TMDB_API_KEY environment variable")
 		return
 	}
