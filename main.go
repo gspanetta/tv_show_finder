@@ -151,13 +151,16 @@ func userSelectShow(ctx *Context) {
 	}
 
 	// let user select a show
-	selectedShow, err := getUserInputNum(ctx, "Select TV show")
+	selectedShow, err := getUserInputNum(ctx, "Select TV show (or type '0' to go back to search prompt)")
 	if err != nil {
 		fmt.Println("No valid input")
 		return
 	}
 
-	if selectedShow > 20 || selectedShow < 1 {
+	if selectedShow == 0 {
+		ctx.nextState = stateUserQuery
+		return
+	} else if selectedShow > 20 || selectedShow < 1 {
 		fmt.Println("No valid selection")
 		return
 	}
